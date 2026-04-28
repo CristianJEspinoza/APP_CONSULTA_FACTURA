@@ -73,7 +73,7 @@ class ReadAPI:
             detraccion = detalle.get("detraccion") or {}
             totales_raw = payload_data.get("totales", {})
             
-            estado_comprobante = detalle.get("estado_comprobante", "")
+            estado_comprobante = detalle.get("estado_comprobante", "").upper()
 
             # -- Extraer documento relacionado (array → primer elemento) --
             docs_relacionados = detalle.get("documentos_relacionados") or []
