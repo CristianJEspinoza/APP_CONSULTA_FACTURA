@@ -74,6 +74,7 @@ class ReadAPI:
             totales_raw = payload_data.get("totales", {})
             
             estado_comprobante = detalle.get("estado_comprobante", "").upper()
+            fecha_emision = detalle.get("fecha_emision", "")
 
             # -- Extraer documento relacionado (array → primer elemento) --
             docs_relacionados = detalle.get("documentos_relacionados") or []
@@ -106,7 +107,7 @@ class ReadAPI:
                 ),
             )
 
-            return {"totales": totales, "estado_comprobante": estado_comprobante}
+            return {"totales": totales, "estado_comprobante": estado_comprobante, "fecha_emision": fecha_emision}
 
         except ValueError:
             raise
@@ -178,12 +179,14 @@ class ReadAPI:
             )
 
         proveedor.estado_comprobante = lucode_result.get("estado_comprobante", "")
+        fecha_emision = lucode_result.get("fecha_emision", "")
 
         totales = lucode_result["totales"]
         return ConsultaResponse(
             codigo=totales.codigo,
             descripcion=totales.descripcion,
             documento_relacionado=totales.documento_relacionado,
+            fecha_emision=fecha_emision,
             monto_total_general=totales.monto_total_general,
             total_grav_exonerado=totales.total_grav_exonerado,
             total_grav_oner=totales.total_grav_oner,

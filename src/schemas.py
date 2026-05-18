@@ -37,6 +37,7 @@ class TotalesFactura(BaseModel):
 
 class ConsultaResponse(TotalesFactura):
     """Respuesta unificada plana con datos de factura + proveedor."""
+    fecha_emision: str = ""
     proveedor: DatosProveedor = DatosProveedor()
 
 
