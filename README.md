@@ -10,7 +10,7 @@ API REST construida con **FastAPI** para consultar comprobantes electrónicos SU
 - 🔄 **Consultas paralelas** — Lucode y PeruDevs se consultan simultáneamente con `asyncio.gather`
 - 📋 **Documentación automática** — Swagger UI en `/docs` y ReDoc en `/redoc`
 - ✅ **Validación de datos** — Schemas Pydantic con validación automática de request/response
-- 🔐 **Autenticación por API Key** — Protección de endpoints con header `X-API-Key`
+- 🔐 **Autenticación por API Key** — Protección de endpoints con header `Authorization`
 - 🔒 **Variables de entorno** — Configuración segura vía `.env`
 - 🌐 **CORS habilitado** — Listo para consumir desde cualquier frontend
 
@@ -29,7 +29,7 @@ APP_CONSULTA_FACTURA/
     ├── __init__.py
     ├── config.py           # Configuración centralizada (pydantic-settings)
     ├── schemas.py          # Modelos Pydantic (request/response)
-    ├── security.py         # Autenticación por API Key (X-API-Key)
+    ├── security.py         # Autenticación por API Key (Authorization)
     ├── services.py         # ReadAPI — lógica de consulta a APIs externas
     └── routes.py           # Endpoints de la API
 ```
@@ -129,16 +129,16 @@ Una vez ejecutada la API, accede a la documentación generada automáticamente:
 
 ## 🔐 Autenticación
 
-Todos los endpoints bajo `/api/v1/*` requieren el header `X-API-Key` con una clave válida.
+Todos los endpoints bajo `/api/v1/*` requieren el header `Authorization` con una clave válida.
 
-| Header        | Valor                              | Requerido                   |
-| ------------- | ---------------------------------- | --------------------------- |
-| `X-API-Key` | Tu API Key configurada en `.env` | ✅ Sí (para `/api/v1/*`) |
+| Header            | Valor                              | Requerido                   |
+| ----------------- | ---------------------------------- | --------------------------- |
+| `Authorization` | Tu API Key configurada en `.env` | ✅ Sí (para `/api/v1/*`) |
 
 **Ejemplo de header:**
 
 ```
-X-API-Key: Rk497drCAbw6S5azXBK9dfbCKpF-s0iZEolWBuUzaqk
+Authorization: Rk497drCAbw6S5azXBK9dfbCKpF-s0iZEolWBuUzaqk
 ```
 
 > ⚠️ El endpoint `GET /` (health check) **no** requiere autenticación.
@@ -206,9 +206,16 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
     "condicion": "HABIDO",
     "estado": "ACTIVO",
     "estado_comprobante": "Aceptado"
-  }
+  },
+  "items": [
+    { "codigo": "4800006", "valor_venta": "61.34" },
+    { "codigo": "5101017", "valor_venta": "83.75" },
+    { "codigo": "3201022", "valor_venta": "2727.38" }
+  ]
 }
 ```
+
+> 📦 El campo `items` lista los productos del comprobante. Por cada item, `codigo` corresponde a `identificacion_interna` y `valor_venta` al valor de venta del item en Lucode.
 
 #### Response de Error (422 — Validación)
 
@@ -228,7 +235,7 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
 
 ```json
 {
-  "detail": "API Key requerida. Envía el header 'X-API-Key'."
+  "detail": "API Key requerida. Envía el header 'Authorization'."
 }
 ```
 
@@ -270,7 +277,7 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
 ```
 ┌─────────────┐     POST /api/v1/consultar-factura     ┌──────────────┐
 │   Cliente    │ ──────────────────────────────────────► │   FastAPI    │
-│  (Frontend)  │  Header: X-API-Key: <key>              │   Router     │
+│  (Frontend)  │  Header: Authorization: <key>          │   Router     │
 └─────────────┘ ◄────────────────────────────────────── └──────┬───────┘
                         Respuesta unificada                    │
                                                     ┌──────────▼──────────┐
@@ -318,7 +325,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/consultar-factura \
 curl -X POST http://127.0.0.1:8000/api/v1/consultar-factura \
   -H "Content-Type: application/json" \
   -d '{"ruc_emisor": "20100190797", "serie": "F081", "numero": "1114003"}'
-# {"detail": "API Key requerida. Envía el header 'X-API-Key'."}
+# {"detail": "API Key requerida. Envía el header 'Authorization'."}
 ```
 
 ---

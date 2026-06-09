@@ -7,6 +7,7 @@ from src.schemas import (
     TotalesFactura,
     DocumentoRelacionado,
     DatosProveedor,
+    ItemFactura,
     ConsultaResponse,
 )
 
@@ -76,6 +77,16 @@ class ReadAPI:
             estado_comprobante = detalle.get("estado_comprobante", "").upper()
             fecha_emision = detalle.get("fecha_emision", "")
 
+            # -- Extraer items (codigo = identificacion_interna) --
+            items_raw = payload_data.get("items") or []
+            items = [
+                ItemFactura(
+                    codigo=item.get("identificacion_interna", ""),
+                    valor_venta=str(item.get("valor_venta", "0.00")),
+                )
+                for item in items_raw
+            ]
+
             # -- Extraer documento relacionado (array → primer elemento) --
             docs_relacionados = detalle.get("documentos_relacionados") or []
             doc_rel = DocumentoRelacionado()
@@ -107,7 +118,12 @@ class ReadAPI:
                 ),
             )
 
-            return {"totales": totales, "estado_comprobante": estado_comprobante, "fecha_emision": fecha_emision}
+            return {
+                "totales": totales,
+                "estado_comprobante": estado_comprobante,
+                "fecha_emision": fecha_emision,
+                "items": items,
+            }
 
         except ValueError:
             raise
@@ -194,4 +210,5 @@ class ReadAPI:
             total_inaf_oner=totales.total_inaf_oner,
             total_valor_venta_exonerado=totales.total_valor_venta_exonerado,
             proveedor=proveedor,
+            items=lucode_result.get("items", []),
         )

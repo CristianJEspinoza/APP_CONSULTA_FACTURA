@@ -22,6 +22,12 @@ class DatosProveedor(BaseModel):
     estado_comprobante: str = ""
 
 
+class ItemFactura(BaseModel):
+    """Item del comprobante extraído de Lucode."""
+    codigo: str = ""
+    valor_venta: str = "0.00"
+
+
 class TotalesFactura(BaseModel):
     """Totales de la factura extraídos de Lucode."""
     codigo: str = ""
@@ -39,6 +45,7 @@ class ConsultaResponse(TotalesFactura):
     """Respuesta unificada plana con datos de factura + proveedor."""
     fecha_emision: str = ""
     proveedor: DatosProveedor = DatosProveedor()
+    items: list[ItemFactura] = []
 
 
 class ErrorResponse(BaseModel):
