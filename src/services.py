@@ -81,7 +81,7 @@ class ReadAPI:
             items_raw = payload_data.get("items") or []
             items = [
                 ItemFactura(
-                    codigo=item.get("identificacion_interna", ""),
+                    codigo_producto=item.get("identificacion_interna", ""),
                     valor_venta=str(item.get("valor_venta", "0.00")),
                 )
                 for item in items_raw

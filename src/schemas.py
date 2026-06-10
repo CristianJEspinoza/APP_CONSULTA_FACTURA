@@ -24,7 +24,7 @@ class DatosProveedor(BaseModel):
 
 class ItemFactura(BaseModel):
     """Item del comprobante extraído de Lucode."""
-    codigo: str = ""
+    codigo_producto: str = ""
     valor_venta: str = "0.00"
 
 
