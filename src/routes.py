@@ -19,17 +19,17 @@ read_api = ReadAPI()
     response_model=ConsultaResponse,
     summary="Consultar factura y datos del proveedor",
     description=(
-        "Consulta la factura en la API de Lucode y los datos del proveedor "
-        "en PeruDevs de forma paralela. Devuelve una respuesta unificada "
-        "con los totales de la factura, los items, y el estado/condición "
-        "del proveedor."
+        "Consulta la factura en la API de Lucode y, con su fecha de emisión y "
+        "monto total, consulta el tracker SUNAT para los datos del proveedor. "
+        "Devuelve una respuesta unificada con los totales de la factura, los "
+        "items, y el estado/condición del proveedor."
     ),
     responses={
         500: {"model": ErrorResponse, "description": "Error interno"},
     },
 )
 async def consultar_factura(request: ConsultaRequest) -> ConsultaResponse:
-    """Endpoint principal que unifica datos de Lucode + PeruDevs."""
+    """Endpoint principal que unifica datos de Lucode + tracker SUNAT."""
     try:
         resultado = await read_api.consultar_factura(
             ruc=request.ruc_emisor,

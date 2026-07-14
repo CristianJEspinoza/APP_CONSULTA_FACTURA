@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-FastAPI REST API that consults Peruvian electronic invoices (SUNAT comprobantes). It unifies, in a single response, invoice data from **Lucode** (apisunat.pe) with supplier RUC status from **PeruDevs**, querying both upstreams in parallel via `asyncio.gather`. Code identifiers and docstrings are in Spanish.
+FastAPI REST API that consults Peruvian electronic invoices (SUNAT comprobantes). It unifies, in a single response, invoice data from **Lucode** (apisunat.pe) with supplier RUC status + comprobante status from the **SUNAT tracker** (an Azure-hosted `ms-tracker-sunat` service). The two upstreams run **sequentially**: Lucode first, then the tracker — the tracker's request needs Lucode's `fecha_emision` and `monto_total_general`. Code identifiers and docstrings are in Spanish.
 
 ## Commands
 
@@ -32,14 +32,15 @@ Interactive docs at `/docs` (Swagger) and `/redoc`. There is **no test suite** i
 
 ## Configuration
 
-All config loads from `.env` via `pydantic-settings` (`src/config.py`, cached singleton `get_settings()`). Required vars: `API_URL_BASE`, `API_TOKEN_LUCODE` (Lucode), `API_URL_PERU_DEVS`, `API_KEY_PERU_DEVS` (PeruDevs), and `API_KEY` (the key this API requires from callers). `.env` is gitignored and absent — create it before running.
+All config loads from `.env` via `pydantic-settings` (`src/config.py`, cached singleton `get_settings()`). Required vars: `API_URL_BASE`, `API_TOKEN_LUCODE` (Lucode), `API_URL_SUNAT_TRACKER`, `API_KEY_SUNAT_TRACKER` (SUNAT tracker), and `API_KEY` (the key this API requires from callers). `.env` is gitignored and absent — create it before running.
 
 ## Architecture
 
-Request flow: `app.py` (FastAPI app + open CORS) → `src/routes.py` (`/api/v1` router, auth applied at router level via `dependencies=[Depends(verify_api_key)]`) → `src/services.py` `ReadAPI.consultar_factura` → fans out to Lucode + PeruDevs in parallel → unified `ConsultaResponse`.
+Request flow: `app.py` (FastAPI app + open CORS) → `src/routes.py` (`/api/v1` router, auth applied at router level via `dependencies=[Depends(verify_api_key)]`) → `src/services.py` `ReadAPI.consultar_factura` → calls Lucode, then the SUNAT tracker → unified `ConsultaResponse`.
 
-- **`src/services.py`** is the core. `consultar_factura` opens one shared `httpx.AsyncClient` and `asyncio.gather`s `consult_api_lucode` + `consult_api_peru_devs`. Lucode supplies invoice totals, detraction, related document, comprobante status, and emission date; PeruDevs supplies supplier `condicion`/`estado`. The two are merged: `proveedor.estado_comprobante` is set from the Lucode result after gather.
-- **Error-handling asymmetry (intentional):** Lucode failures raise `ValueError` and abort the request (Lucode data is essential). PeruDevs failures are swallowed and return an empty `DatosProveedor()` (supplier data is best-effort). Preserve this when editing.
+- **`src/services.py`** is the core. `consultar_factura` opens one shared `httpx.AsyncClient`, awaits `consult_api_lucode`, then awaits `consult_api_sunat_tracker` passing Lucode's `fecha_emision` and `monto_total_general`. Lucode supplies invoice totals, detraction, related document, and emission date; the tracker supplies the whole `proveedor` block (`condicion` ← `condDomiRuc`, `estado` ← `estadoRuc`, `estado_comprobante` ← `estadoCp`). The calls are **sequential**, not parallel, because of this data dependency.
+- **Tracker request contract:** `POST` with header `X-API-KEY`; body `{numero_ruc, tipo_comprobante, comprobante (= "SERIE-NUMERO"), fecha_emision (d/m/yyyy), monto_comprobante (number)}`. Lucode returns `fecha_emision` as ISO (`yyyy-mm-dd`) and `monto_total_general` as a string, so `_formatear_fecha` (ISO → `d/m/yyyy`) and `_parsear_monto` (str → float) adapt them; both are defensive (pass-through / `0.0` on bad input).
+- **Error-handling asymmetry (intentional):** Lucode failures raise `ValueError` and abort the request (Lucode data is essential). Tracker failures are swallowed and return an empty `DatosProveedor()` (supplier data is best-effort). Preserve this when editing.
 - **`src/schemas.py`** — Pydantic models. `ConsultaResponse` extends `TotalesFactura` (flat invoice totals) and adds `fecha_emision` + nested `proveedor`. All numeric totals are serialized as **strings** (e.g. `"0.00"`), not numbers.
 - **`src/security.py`** — `verify_api_key` compares the caller's key against `settings.API_KEY`. Missing key → 401, wrong key → 403. The health check `GET /` is outside the router and unauthenticated.
 

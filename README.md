@@ -1,13 +1,13 @@
 # 📄 API Consulta Documentos Electrónicos
 
-API REST construida con **FastAPI** para consultar comprobantes electrónicos SUNAT. Unifica en una sola respuesta los datos de facturación (vía **Lucode**) con la información del proveedor (vía **PeruDevs**), ejecutando ambas consultas en **paralelo** para máxima velocidad.
+API REST construida con **FastAPI** para consultar comprobantes electrónicos SUNAT. Unifica en una sola respuesta los datos de facturación (vía **Lucode**) con la información del proveedor y el estado del comprobante (vía **tracker SUNAT**). Consulta primero Lucode y luego el tracker, ya que este necesita la fecha de emisión y el monto que devuelve Lucode.
 
 ---
 
 ## 🚀 Características
 
 - ⚡ **Alta velocidad** — FastAPI + Uvicorn (ASGI asíncrono)
-- 🔄 **Consultas paralelas** — Lucode y PeruDevs se consultan simultáneamente con `asyncio.gather`
+- 🔄 **Consultas encadenadas** — Lucode alimenta al tracker SUNAT (fecha de emisión + monto) para obtener los datos del proveedor
 - 📋 **Documentación automática** — Swagger UI en `/docs` y ReDoc en `/redoc`
 - ✅ **Validación de datos** — Schemas Pydantic con validación automática de request/response
 - 🔐 **Autenticación por API Key** — Protección de endpoints con header `Authorization`
@@ -41,7 +41,7 @@ APP_CONSULTA_FACTURA/
 - **Python 3.11** o **3.12** o **3.13** (Python 3.14 no es compatible con pydantic-core aún)
 - Tokens de acceso para:
   - **Lucode** (API SUNAT de comprobantes)
-  - **PeruDevs** (API de consulta de RUC)
+  - **Tracker SUNAT** (API de consulta de proveedor/RUC y estado del comprobante)
 
 ---
 
@@ -81,9 +81,9 @@ Crear un archivo `.env` en la raíz del proyecto:
 API_URL_BASE=https://dev.apisunat.pe/api/v1/sunat/comprobante
 API_TOKEN_LUCODE=tu_token_aqui
 
-# API PeruDevs
-API_URL_PERU_DEVS=https://api.perudevs.com/api/v1/ruc
-API_KEY_PERU_DEVS=tu_key_aqui
+# API Tracker SUNAT
+API_URL_SUNAT_TRACKER=https://ms-tracker-sunat-f3h4f6eec3exd5dc.westus-01.azurewebsites.net/api/sunat/consulta
+API_KEY_SUNAT_TRACKER=tu_key_aqui
 
 # Seguridad — API Key para proteger esta API
 API_KEY=tu_api_key_aqui
@@ -119,8 +119,8 @@ La API estará disponible en: `http://127.0.0.1:8000`
 
 Una vez ejecutada la API, accede a la documentación generada automáticamente:
 
-| Herramienta            | URL                                                                   |
-| ---------------------- | --------------------------------------------------------------------- |
+| Herramienta            | URL                                                                     |
+| ---------------------- | ----------------------------------------------------------------------- |
 | **Swagger UI**   | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)                 |
 | **ReDoc**        | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)               |
 | **OpenAPI JSON** | [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) |
@@ -131,9 +131,9 @@ Una vez ejecutada la API, accede a la documentación generada automáticamente:
 
 Todos los endpoints bajo `/api/v1/*` requieren el header `Authorization` con una clave válida.
 
-| Header            | Valor                              | Requerido                   |
-| ----------------- | ---------------------------------- | --------------------------- |
-| `Authorization` | Tu API Key configurada en `.env` | ✅ Sí (para `/api/v1/*`) |
+| Header            | Valor                             | Requerido                  |
+| ----------------- | --------------------------------- | -------------------------- |
+| `Authorization` | Tu API Key configurada en`.env` | ✅ Sí (para`/api/v1/*`) |
 
 **Ejemplo de header:**
 
@@ -164,7 +164,7 @@ Verifica que la API está corriendo. **No requiere API Key.**
 
 ### `POST /api/v1/consultar-factura` — Consultar Factura 🔐
 
-Consulta los datos de un comprobante electrónico y la información del proveedor de forma unificada.
+Consulta los datos de un comprobante electrónico y la información del proveedor de forma unificada. Internamente consulta Lucode y, con su fecha de emisión y monto, el tracker SUNAT.
 
 > 🔑 **Requiere header:** Authorization y Content-Type
 
@@ -267,8 +267,8 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
 | `uvicorn[standard]` | 0.34.2   | Servidor ASGI (con extras: watchfiles, httptools) |
 | `httpx`             | 0.28.1   | Cliente HTTP async para llamadas a APIs externas  |
 | `pydantic`          | 2.11.2   | Validación de datos y serialización             |
-| `pydantic-settings` | 2.9.1    | Carga de configuración desde `.env`            |
-| `python-dotenv`     | 1.1.0    | Lectura de archivos `.env`                      |
+| `pydantic-settings` | 2.9.1    | Carga de configuración desde`.env`             |
+| `python-dotenv`     | 1.1.0    | Lectura de archivos`.env`                       |
 
 ---
 
@@ -290,17 +290,25 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
                                                     │   (services.py)    │
                                                     └──────────┬──────────┘
                                                                │
-                                              asyncio.gather (paralelo)
-                                                    ┌──────────┴──────────┐
+                                          consulta secuencial (encadenada)
+                                                    ┌──────────▼──────────┐
+                                                    │   API Lucode        │
+                                                    │  (Comprobante)      │
                                                     │                     │
-                                           ┌────────▼────────┐  ┌────────▼────────┐
-                                           │   API Lucode    │  │  API PeruDevs   │
-                                           │  (Comprobante)  │  │     (RUC)       │
-                                           │                 │  │                 │
-                                           │ • Items         │  │ • Condición     │
-                                           │ • Totales       │  │ • Estado        │
-                                           │ • Detracción    │  │                 │
-                                           └─────────────────┘  └─────────────────┘
+                                                    │ • Items             │
+                                                    │ • Totales           │
+                                                    │ • Detracción        │
+                                                    │ • Fecha emisión     │
+                                                    └──────────┬──────────┘
+                                                               │ fecha + monto
+                                                    ┌──────────▼──────────┐
+                                                    │  API Tracker SUNAT  │
+                                                    │   (Proveedor)       │
+                                                    │                     │
+                                                    │ • Condición         │
+                                                    │ • Estado RUC        │
+                                                    │ • Estado comprobante│
+                                                    └─────────────────────┘
 ```
 
 ---

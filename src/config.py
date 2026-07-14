@@ -9,9 +9,12 @@ class Settings(BaseSettings):
     API_URL_BASE: str = "https://dev.apisunat.pe/api/v1/sunat/comprobante"
     API_TOKEN_LUCODE: str = ""
 
-    # API PeruDevs
-    API_URL_PERU_DEVS: str = "https://api.perudevs.com/api/v1/ruc"
-    API_KEY_PERU_DEVS: str = ""
+    # API Tracker SUNAT — datos del proveedor (condicion, estado, estado del comprobante)
+    API_URL_SUNAT_TRACKER: str = (
+        "https://ms-tracker-sunat-f3h4f6eec3exd5dc.westus-01.azurewebsites.net"
+        "/api/sunat/consulta"
+    )
+    API_KEY_SUNAT_TRACKER: str = ""
 
     # Seguridad — API Key para proteger esta API
     API_KEY: str = ""

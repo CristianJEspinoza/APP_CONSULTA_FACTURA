@@ -1,6 +1,7 @@
 import httpx
-import asyncio
 import logging
+
+from datetime import datetime
 
 from src.config import get_settings
 from src.schemas import (
@@ -135,44 +136,80 @@ class ReadAPI:
             raise ValueError(f"Error interno al consultar Lucode: {str(exc)}")
 
     # ------------------------------------------------------------------ #
-    #  API PeruDevs – datos del proveedor
+    #  API Tracker SUNAT – datos del proveedor
     # ------------------------------------------------------------------ #
-    async def consult_api_peru_devs(
-        self, client: httpx.AsyncClient, ruc: str
+    @staticmethod
+    def _formatear_fecha(fecha: str) -> str:
+        """Convierte la fecha ISO (yyyy-mm-dd) de Lucode al formato d/m/yyyy
+        que exige el tracker. Si viene en otro formato, la envía tal cual."""
+        if not fecha:
+            return ""
+        try:
+            dt = datetime.strptime(fecha, "%Y-%m-%d")
+            return f"{dt.day}/{dt.month}/{dt.year}"
+        except ValueError:
+            return fecha
+
+    @staticmethod
+    def _parsear_monto(monto: str) -> float:
+        """Convierte el monto total (string) a número para el tracker."""
+        try:
+            return float(monto)
+        except (TypeError, ValueError):
+            return 0.0
+
+    async def consult_api_sunat_tracker(
+        self,
+        client: httpx.AsyncClient,
+        ruc: str,
+        tipo_comprobante: str,
+        comprobante: str,
+        fecha_emision: str,
+        monto_comprobante: str,
     ) -> DatosProveedor:
-        """Consulta PeruDevs y devuelve condición + estado del proveedor."""
-        params = {
-            "document": ruc,
-            "key": self.settings.API_KEY_PERU_DEVS,
+        """Consulta el tracker SUNAT y devuelve condición, estado del RUC y
+        estado del comprobante del proveedor."""
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-KEY": self.settings.API_KEY_SUNAT_TRACKER,
+        }
+        payload = {
+            "numero_ruc": ruc,
+            "tipo_comprobante": tipo_comprobante,
+            "comprobante": comprobante,
+            "fecha_emision": self._formatear_fecha(fecha_emision),
+            "monto_comprobante": self._parsear_monto(monto_comprobante),
         }
 
         try:
-            response = await client.get(
-                self.settings.API_URL_PERU_DEVS,
-                params=params,
+            response = await client.post(
+                self.settings.API_URL_SUNAT_TRACKER,
+                json=payload,
+                headers=headers,
                 timeout=30.0,
             )
             response.raise_for_status()
             data = response.json()
 
-            if data.get("estado") and "resultado" in data:
-                resultado = data["resultado"]
+            if data.get("success") and data.get("data"):
+                resultado = data["data"]
                 return DatosProveedor(
-                    condicion=resultado.get("condicion", ""),
-                    estado=resultado.get("estado", ""),
+                    condicion=resultado.get("condDomiRuc", "") or "",
+                    estado=resultado.get("estadoRuc", "") or "",
+                    estado_comprobante=resultado.get("estadoCp", "") or "",
                 )
 
             return DatosProveedor()
 
         except httpx.HTTPStatusError as exc:
-            logger.error("PeruDevs HTTP error: %s", exc.response.status_code)
+            logger.error("Tracker SUNAT HTTP error: %s", exc.response.status_code)
             return DatosProveedor()
         except Exception as exc:
-            logger.error("PeruDevs error: %s", exc)
+            logger.error("Tracker SUNAT error: %s", exc)
             return DatosProveedor()
 
     # ------------------------------------------------------------------ #
-    #  Consulta unificada (ambas APIs en paralelo)
+    #  Consulta unificada (Lucode → Tracker SUNAT)
     # ------------------------------------------------------------------ #
     async def consultar_factura(
         self,
@@ -182,22 +219,28 @@ class ReadAPI:
         tipo_comprobante: str = "01",
     ) -> ConsultaResponse:
         """
-        Llama a Lucode y PeruDevs en **paralelo** y unifica los resultados.
+        Llama a Lucode y, con su fecha de emisión y monto total, consulta el
+        tracker SUNAT para obtener los datos del proveedor. Unifica ambos
+        resultados en una sola respuesta.
         """
         async with httpx.AsyncClient() as client:
-            lucode_task = self.consult_api_lucode(
+            # Lucode primero: su fecha_emision y monto alimentan al tracker.
+            lucode_result = await self.consult_api_lucode(
                 client, ruc, serie, numero, tipo_comprobante
             )
-            peru_devs_task = self.consult_api_peru_devs(client, ruc)
 
-            lucode_result, proveedor = await asyncio.gather(
-                lucode_task, peru_devs_task
+            totales = lucode_result["totales"]
+            fecha_emision = lucode_result.get("fecha_emision", "")
+
+            proveedor = await self.consult_api_sunat_tracker(
+                client,
+                ruc=ruc,
+                tipo_comprobante=tipo_comprobante,
+                comprobante=f"{serie}-{numero}",
+                fecha_emision=fecha_emision,
+                monto_comprobante=totales.monto_total_general,
             )
 
-        proveedor.estado_comprobante = lucode_result.get("estado_comprobante", "")
-        fecha_emision = lucode_result.get("fecha_emision", "")
-
-        totales = lucode_result["totales"]
         return ConsultaResponse(
             codigo=totales.codigo,
             descripcion=totales.descripcion,

@@ -8,7 +8,7 @@ app = FastAPI(
     description=(
         "API para consultar documentos electronicos SUNAT. "
         "Unifica datos de los documentos electronicos (Lucode) con información "
-        "del proveedor (PeruDevs) en una sola respuesta."
+        "del proveedor (tracker SUNAT) en una sola respuesta."
     ),
     version="1.0.0",
 )

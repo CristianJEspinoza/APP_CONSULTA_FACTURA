@@ -16,7 +16,7 @@ class DocumentoRelacionado(BaseModel):
 
 
 class DatosProveedor(BaseModel):
-    """Datos del proveedor extraídos de PeruDevs y estado de Lucode."""
+    """Datos del proveedor extraídos del tracker SUNAT."""
     condicion: str = ""
     estado: str = ""
     estado_comprobante: str = ""
