@@ -1,3 +1,6 @@
+
+.
+
 # 📄 API Consulta Documentos Electrónicos
 
 API REST construida con **FastAPI** para consultar comprobantes electrónicos SUNAT. Unifica en una sola respuesta los datos de facturación (vía **Lucode**) con la información del proveedor y el estado del comprobante (vía **tracker SUNAT**). Consulta primero Lucode y luego el tracker, ya que este necesita la fecha de emisión y el monto que devuelve Lucode.

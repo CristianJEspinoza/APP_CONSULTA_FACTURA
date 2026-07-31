@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
+        # Ignora variables de entorno extra (p. ej. PeruDevs heredadas) en vez
+        # de fallar el arranque con extra_forbidden.
+        "extra": "ignore",
     }
 
 

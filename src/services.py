@@ -78,6 +78,10 @@ class ReadAPI:
             estado_comprobante = detalle.get("estado_comprobante", "").upper()
             fecha_emision = detalle.get("fecha_emision", "")
 
+            # -- Extraer URL de descarga del PDF --
+            url_descarga = payload_data.get("url_descarga") or {}
+            pdf = url_descarga.get("pdf", "") or ""
+
             # -- Extraer items (codigo = identificacion_interna) --
             items_raw = payload_data.get("items") or []
             items = [
@@ -123,6 +127,7 @@ class ReadAPI:
                 "totales": totales,
                 "estado_comprobante": estado_comprobante,
                 "fecha_emision": fecha_emision,
+                "pdf": pdf,
                 "items": items,
             }
 
@@ -169,9 +174,17 @@ class ReadAPI:
     ) -> DatosProveedor:
         """Consulta el tracker SUNAT y devuelve condición, estado del RUC y
         estado del comprobante del proveedor."""
+        api_key = (self.settings.API_KEY_SUNAT_TRACKER or "").strip()
+        if not api_key:
+            logger.error(
+                "Tracker SUNAT: API_KEY_SUNAT_TRACKER vacía o no configurada "
+                "(revisar las App Settings del entorno)."
+            )
+            return DatosProveedor()
+
         headers = {
             "Content-Type": "application/json",
-            "X-API-KEY": self.settings.API_KEY_SUNAT_TRACKER,
+            "X-API-KEY": api_key,
         }
         payload = {
             "numero_ruc": ruc,
@@ -202,7 +215,13 @@ class ReadAPI:
             return DatosProveedor()
 
         except httpx.HTTPStatusError as exc:
-            logger.error("Tracker SUNAT HTTP error: %s", exc.response.status_code)
+            cuerpo = exc.response.text[:200]
+            logger.error(
+                "Tracker SUNAT HTTP %s (X-API-KEY len=%d): %s",
+                exc.response.status_code,
+                len(api_key),
+                cuerpo,
+            )
             return DatosProveedor()
         except Exception as exc:
             logger.error("Tracker SUNAT error: %s", exc)
@@ -231,6 +250,7 @@ class ReadAPI:
 
             totales = lucode_result["totales"]
             fecha_emision = lucode_result.get("fecha_emision", "")
+            pdf = lucode_result.get("pdf", "")
 
             proveedor = await self.consult_api_sunat_tracker(
                 client,
@@ -246,6 +266,7 @@ class ReadAPI:
             descripcion=totales.descripcion,
             documento_relacionado=totales.documento_relacionado,
             fecha_emision=fecha_emision,
+            pdf=pdf,
             monto_total_general=totales.monto_total_general,
             total_grav_exonerado=totales.total_grav_exonerado,
             total_grav_oner=totales.total_grav_oner,
