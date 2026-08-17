@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.routes import router
+from src.routes import router, router_v2
 
 app = FastAPI(
     title="API Consulta Documentos Electronicos",
@@ -24,6 +24,7 @@ app.add_middleware(
 
 # Registrar rutas
 app.include_router(router)
+app.include_router(router_v2)
 
 
 @app.get("/", tags=["Health"])

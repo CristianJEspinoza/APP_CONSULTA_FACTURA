@@ -164,7 +164,20 @@ Verifica que la API está corriendo. **No requiere API Key.**
 
 ---
 
-### `POST /api/v1/consultar-factura` — Consultar Factura 🔐
+> 🔀 **Dos versiones disponibles.** `v1` es el contrato estable y **no cambia**; `v2` es el contrato vigente al que se suman los campos nuevos. Ambas aceptan el mismo request y comparten la misma lógica de consulta — solo difieren en los campos de la respuesta.
+>
+> | Campo                                | v1  | v2  |
+> | ------------------------------------ | --- | --- |
+> | Totales, detracción, doc. relacionado | ✅  | ✅  |
+> | `fecha_emision`                     | ✅  | ✅  |
+> | `proveedor`                         | ✅  | ✅  |
+> | `items[].codigo_producto` / `valor_venta` | ✅ | ✅ |
+> | `pdf`                               | ❌  | ✅  |
+> | `items[].impuesto_nombre_tributo`   | ❌  | ✅  |
+
+---
+
+### `POST /api/v1/consultar-factura` — Consultar Factura (v1) 🔐
 
 Consulta los datos de un comprobante electrónico y la información del proveedor de forma unificada. Internamente consulta Lucode y, con su fecha de emisión y monto, el tracker SUNAT.
 
@@ -210,14 +223,14 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
     "estado_comprobante": "ACEPTADO"
   },
   "items": [
-    { "codigo_producto": "4800006", "valor_venta": "61.34", "impuesto_nombre_tributo": "IGV" },
-    { "codigo_producto": "5101017", "valor_venta": "83.75", "impuesto_nombre_tributo": "IGV" },
-    { "codigo_producto": "3201022", "valor_venta": "2727.38", "impuesto_nombre_tributo": "IGV" }
+    { "codigo_producto": "4800006", "valor_venta": "61.34" },
+    { "codigo_producto": "5101017", "valor_venta": "83.75" },
+    { "codigo_producto": "3201022", "valor_venta": "2727.38" }
   ]
 }
 ```
 
-> 📦 El campo `items` lista los productos del comprobante. Por cada item, `codigo_producto` corresponde a `identificacion_interna`, `valor_venta` al valor de venta del item y `impuesto_nombre_tributo` al nombre del tributo aplicado en Lucode (ej: `IGV` en facturas, `RET 4TA` en recibos por honorarios).
+> 📦 El campo `items` lista los productos del comprobante. Por cada item, `codigo_producto` corresponde a `identificacion_interna` y `valor_venta` al valor de venta del item en Lucode.
 
 #### Response de Error (422 — Validación)
 
@@ -258,6 +271,66 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
   "detail": "Descripción del error"
 }
 ```
+
+---
+
+### `POST /api/v2/consultar-factura` — Consultar Factura (v2) 🔐
+
+Idéntica a v1 en request, autenticación y errores. Añade a la respuesta la URL del `pdf` del comprobante y, en cada item, `impuesto_nombre_tributo`.
+
+> 🔑 **Requiere header:** Authorization y Content-Type
+
+#### Request Body
+
+```json
+{
+  "tipo_comprobante": "02",
+  "ruc_emisor": "10104710854",
+  "serie": "E001",
+  "numero": "52"
+}
+```
+
+#### Response Exitosa (200)
+
+```json
+{
+  "codigo": "",
+  "descripcion": "",
+  "documento_relacionado": {
+    "factura_relacionada": "",
+    "fecha_emision": ""
+  },
+  "monto_total_general": "6000.00",
+  "total_grav_exonerado": "0.00",
+  "total_grav_oner": "6000.00",
+  "total_igv": "0.00",
+  "total_inaf_oner": "0.00",
+  "total_valor_venta_exonerado": "0.00",
+  "fecha_emision": "2026-07-01",
+  "pdf": "https://dev.apisunat.pe/rce/document/pdf/485661387/10104710854-02-E001-52",
+  "proveedor": {
+    "condicion": "",
+    "estado": "",
+    "estado_comprobante": "ACEPTADO"
+  },
+  "items": [
+    { "codigo_producto": "", "valor_venta": "6000.00", "impuesto_nombre_tributo": "RET 4TA" }
+  ]
+}
+```
+
+> 🧾 `impuesto_nombre_tributo` es el nombre del tributo aplicado al item según Lucode: `IGV` en facturas, `RET 4TA` en recibos por honorarios.
+
+---
+
+## 🧾 Recibos por Honorarios (`tipo_comprobante: "02"`)
+
+El tracker SUNAT **no valida** los recibos por honorarios: responde `success: false` con el mensaje `Error en consulta SUNAT: Sin código`. Por eso, para el tipo `02`:
+
+- `proveedor.estado_comprobante` se toma del `detalle.estado_comprobante` que devuelve Lucode (en mayúsculas, para igualar el formato del tracker). Aplica **tanto en v1 como en v2**.
+- `proveedor.condicion` y `proveedor.estado` quedan vacíos — son datos del RUC que solo entrega el tracker y Lucode no expone.
+- `items[].codigo_producto` suele venir vacío, ya que `identificacion_interna` no aplica a servicios.
 
 ---
 

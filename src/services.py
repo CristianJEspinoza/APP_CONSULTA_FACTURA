@@ -8,8 +8,8 @@ from src.schemas import (
     TotalesFactura,
     DocumentoRelacionado,
     DatosProveedor,
-    ItemFactura,
-    ConsultaResponse,
+    ItemFacturaV2,
+    ConsultaResponseV2,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ class ReadAPI:
             # -- Extraer items (codigo = identificacion_interna) --
             items_raw = payload_data.get("items") or []
             items = [
-                ItemFactura(
+                ItemFacturaV2(
                     codigo_producto=item.get("identificacion_interna", ""),
                     valor_venta=str(item.get("valor_venta", "0.00")),
                     impuesto_nombre_tributo=item.get("impuesto_nombre_tributo", "") or "",
@@ -241,11 +241,14 @@ class ReadAPI:
         serie: str,
         numero: str,
         tipo_comprobante: str = "01",
-    ) -> ConsultaResponse:
+    ) -> ConsultaResponseV2:
         """
         Llama a Lucode y, con su fecha de emisión y monto total, consulta el
         tracker SUNAT para obtener los datos del proveedor. Unifica ambos
         resultados en una sola respuesta.
+
+        Devuelve siempre el contrato v2 (el superconjunto); la ruta v1 lo
+        proyecta a su propio contrato.
         """
         async with httpx.AsyncClient() as client:
             # Lucode primero: su fecha_emision y monto alimentan al tracker.
@@ -274,7 +277,7 @@ class ReadAPI:
                 if estado_lucode:
                     proveedor.estado_comprobante = estado_lucode
 
-        return ConsultaResponse(
+        return ConsultaResponseV2(
             codigo=totales.codigo,
             descripcion=totales.descripcion,
             documento_relacionado=totales.documento_relacionado,

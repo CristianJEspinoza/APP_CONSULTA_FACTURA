@@ -23,9 +23,14 @@ class DatosProveedor(BaseModel):
 
 
 class ItemFactura(BaseModel):
-    """Item del comprobante extraído de Lucode."""
+    """Item del comprobante extraído de Lucode (contrato v1)."""
     codigo_producto: str = ""
     valor_venta: str = "0.00"
+
+
+class ItemFacturaV2(ItemFactura):
+    """Item del comprobante (contrato v2): añade el tributo aplicado
+    (`IGV` en facturas, `RET 4TA` en recibos por honorarios)."""
     impuesto_nombre_tributo: str = ""
 
 
@@ -43,11 +48,21 @@ class TotalesFactura(BaseModel):
 
 
 class ConsultaResponse(TotalesFactura):
-    """Respuesta unificada plana con datos de factura + proveedor."""
+    """Respuesta unificada plana con datos de factura + proveedor (contrato v1).
+
+    Contrato estable: no se le agregan campos nuevos. Las incorporaciones van
+    en `ConsultaResponseV2`.
+    """
     fecha_emision: str = ""
-    pdf: str = ""
     proveedor: DatosProveedor = DatosProveedor()
     items: list[ItemFactura] = []
+
+
+class ConsultaResponseV2(ConsultaResponse):
+    """Respuesta unificada (contrato v2): añade la URL del PDF y, por item,
+    el nombre del tributo aplicado."""
+    pdf: str = ""
+    items: list[ItemFacturaV2] = []
 
 
 class ErrorResponse(BaseModel):
