@@ -14,6 +14,9 @@ from src.schemas import (
 
 logger = logging.getLogger(__name__)
 
+# Recibo por Honorarios Electrónico: el tracker SUNAT no valida este tipo.
+TIPO_RECIBO_HONORARIOS = "02"
+
 
 class ReadAPI:
     """Servicio para consultar APIs externas de facturación."""
@@ -75,7 +78,8 @@ class ReadAPI:
             detraccion = detalle.get("detraccion") or {}
             totales_raw = payload_data.get("totales", {})
             
-            estado_comprobante = detalle.get("estado_comprobante", "").upper()
+            # En mayúsculas para igualar el formato del tracker SUNAT ("ACEPTADO").
+            estado_comprobante = (detalle.get("estado_comprobante", "") or "").upper()
             fecha_emision = detalle.get("fecha_emision", "")
 
             # -- Extraer URL de descarga del PDF --
@@ -88,6 +92,7 @@ class ReadAPI:
                 ItemFactura(
                     codigo_producto=item.get("identificacion_interna", ""),
                     valor_venta=str(item.get("valor_venta", "0.00")),
+                    impuesto_nombre_tributo=item.get("impuesto_nombre_tributo", "") or "",
                 )
                 for item in items_raw
             ]
@@ -260,6 +265,14 @@ class ReadAPI:
                 fecha_emision=fecha_emision,
                 monto_comprobante=totales.monto_total_general,
             )
+
+            # Los recibos por honorarios (02) no los valida el tracker SUNAT
+            # (responde "Error en consulta SUNAT: Sin código"), así que su
+            # estado se toma del detalle que devuelve Lucode.
+            if tipo_comprobante == TIPO_RECIBO_HONORARIOS:
+                estado_lucode = lucode_result.get("estado_comprobante", "")
+                if estado_lucode:
+                    proveedor.estado_comprobante = estado_lucode
 
         return ConsultaResponse(
             codigo=totales.codigo,

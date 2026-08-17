@@ -26,6 +26,7 @@ class ItemFactura(BaseModel):
     """Item del comprobante extraído de Lucode."""
     codigo_producto: str = ""
     valor_venta: str = "0.00"
+    impuesto_nombre_tributo: str = ""
 
 
 class TotalesFactura(BaseModel):

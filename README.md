@@ -1,4 +1,3 @@
-
 .
 
 # 📄 API Consulta Documentos Electrónicos
@@ -208,17 +207,17 @@ Consulta los datos de un comprobante electrónico y la información del proveedo
   "proveedor": {
     "condicion": "HABIDO",
     "estado": "ACTIVO",
-    "estado_comprobante": "Aceptado"
+    "estado_comprobante": "ACEPTADO"
   },
   "items": [
-    { "codigo": "4800006", "valor_venta": "61.34" },
-    { "codigo": "5101017", "valor_venta": "83.75" },
-    { "codigo": "3201022", "valor_venta": "2727.38" }
+    { "codigo_producto": "4800006", "valor_venta": "61.34", "impuesto_nombre_tributo": "IGV" },
+    { "codigo_producto": "5101017", "valor_venta": "83.75", "impuesto_nombre_tributo": "IGV" },
+    { "codigo_producto": "3201022", "valor_venta": "2727.38", "impuesto_nombre_tributo": "IGV" }
   ]
 }
 ```
 
-> 📦 El campo `items` lista los productos del comprobante. Por cada item, `codigo` corresponde a `identificacion_interna` y `valor_venta` al valor de venta del item en Lucode.
+> 📦 El campo `items` lista los productos del comprobante. Por cada item, `codigo_producto` corresponde a `identificacion_interna`, `valor_venta` al valor de venta del item y `impuesto_nombre_tributo` al nombre del tributo aplicado en Lucode (ej: `IGV` en facturas, `RET 4TA` en recibos por honorarios).
 
 #### Response de Error (422 — Validación)
 
